@@ -95,9 +95,26 @@ class Model:
             encoders={},
         )
 
+        agency_csv = "data/stats/monthlySalesByAgency.csv"
+        if os.path.exists(agency_csv):
+            self._TrainSingle(
+                csv_path=agency_csv,
+                features=["month_number", "agencyId"],
+                label="sales_count",
+                model_path="models/sales_by_agency.pkl",
+                encoders={"agencyId": "models/agency_encoder.pkl"},
+            )
+        else:
+            print("[Model] Warning: monthlySalesByAgency.csv not found — agency model skipped.")
+
     def _NextMonthNumber(self) -> int:
         now = datetime.now()
         return now.year * 12 + now.month + 1
+
+    def _MonthNumber(self, offset: int = 1) -> int:
+        """Return month_number for now + `offset` months (offset=1 → next month)."""
+        now = datetime.now()
+        return now.year * 12 + now.month + offset
 
     def _BuildRow(self, month_number: int) -> dict:
         month_of_year = month_number % 12 or 12
@@ -112,7 +129,7 @@ class Model:
         features = joblib.load(model_path.replace(".pkl", "_features.pkl"))
         data     = pd.DataFrame([row])[features]
         result   = model.predict(data)[0]
-        return max(0, round(result))   # jamais négatif
+        return max(0, round(result))
 
     def PredictNextMonthPerZoneAndType(self, zone: str, type_: str) -> int:
         zoneEncoder = joblib.load("models/zone_encoder.pkl")
@@ -138,6 +155,34 @@ class Model:
         row = self._BuildRow(self._NextMonthNumber())
         return self._Predict("models/sales_global.pkl", row)
 
+    def PredictNextMonthPerAgency(self, agency_id) -> int:
+        """Predict sales for a single agency next month."""
+        agencyEncoder = joblib.load("models/agency_encoder.pkl")
+        row = {**self._BuildRow(self._NextMonthNumber()),
+               "agencyId": agencyEncoder.transform([str(agency_id)])[0]}
+        return self._Predict("models/sales_by_agency.pkl", row)
+
+    def ForecastAgencyNextMonths(self, agency_id, months: int = 3) -> list[dict]:
+        """
+        Return a list of { month, predicted } for the next `months` months,
+        using the trained Ridge model — no random noise, no ratio tricks.
+        """
+        agencyEncoder = joblib.load("models/agency_encoder.pkl")
+        encoded_id    = agencyEncoder.transform([str(agency_id)])[0]
+
+        result = []
+        for offset in range(1, months + 1):
+            mn  = self._MonthNumber(offset)
+            row = {**self._BuildRow(mn), "agencyId": encoded_id}
+            predicted = self._Predict("models/sales_by_agency.pkl", row)
+            month_of_year = mn % 12 or 12
+            year          = (mn - 1) // 12
+            label         = datetime(year, month_of_year, 1).strftime("%B")
+
+            result.append({"month": label, "predicted": predicted})
+
+        return result
+
     def PredictAllNextMonth(self) -> dict:
         zoneEncoder     = joblib.load("models/zone_encoder.pkl")
         typeEncoder     = joblib.load("models/type_encoder.pkl")
@@ -147,7 +192,7 @@ class Model:
         zones = list(zoneEncoder.classes_)
         types = list(typeEncoder.classes_)
 
-        return {
+        result = {
             "global": self.PredictNextMonthGlobal(),
             "by_zone": {
                 zone: self.PredictNextMonthPerZone(zone)
@@ -165,3 +210,13 @@ class Model:
                 for zone in zones
             },
         }
+
+        agency_model = "models/sales_by_agency.pkl"
+        if os.path.exists(agency_model):
+            agencyEncoder = joblib.load("models/agency_encoder.pkl")
+            result["by_agency"] = {
+                agency_id: self.PredictNextMonthPerAgency(agency_id)
+                for agency_id in agencyEncoder.classes_
+            }
+
+        return result

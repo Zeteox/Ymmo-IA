@@ -52,25 +52,45 @@ class DataAnalyst:
 
     def AnalyseData(self):
         transactions = pd.read_csv("data/transactions.csv")
-        buildings = pd.read_csv("data/buildings.csv")
+        buildings    = pd.read_csv("data/buildings.csv")
+        agencies     = pd.read_csv("data/agencies.csv")
 
-        df = transactions.merge(
-            buildings,
-            left_on="buildingId",
-            right_on="id"
-        )
+        df = transactions.merge(buildings, left_on="buildingId", right_on="id")
 
         salesByZones = (df.groupby("zone").size().reset_index(name="sales_count").sort_values("sales_count", ascending=False))
         salesByType = (df.groupby("type").size().reset_index(name="sales_count").sort_values("sales_count", ascending=False))
         avgPriceByZone = (df.groupby("zone")["amount"].mean().reset_index(name="average_price"))
         salesByZoneType = (df.groupby(["zone", "type"]).size().reset_index(name="sales_count").sort_values("sales_count", ascending=False))
 
-        salesByZones.to_csv("data/stats/salesByZones.csv", index=False)
-        salesByType.to_csv("data/stats/salesByType.csv", index=False)
-        avgPriceByZone.to_csv("data/stats/avgPriceByZone.csv", index=False)
+        salesByZones.to_csv("data/stats/salesByZones.csv",       index=False)
+        salesByType.to_csv("data/stats/salesByType.csv",         index=False)
+        avgPriceByZone.to_csv("data/stats/avgPriceByZone.csv",   index=False)
         salesByZoneType.to_csv("data/stats/salesByZoneType.csv", index=False)
 
-        df["date"] = pd.to_datetime(df["date"])
+        if "agencyId" in buildings.columns:
+            df_agency = df.copy()
+            df_agency = df_agency.merge(
+                agencies[["id", "name"]].rename(
+                    columns={
+                        "id": "agencyId_y",
+                        "name": "agencyName"
+                    }
+                ),
+                on="agencyId_y",
+                how="left",
+            )
+            salesByAgency = (
+                df_agency.groupby(["agencyId_y", "agencyName_y"])
+                .size()
+                .reset_index(name="sales_count")
+                .sort_values("sales_count", ascending=False)
+            )
+            salesByAgency.to_csv("data/stats/salesByAgency.csv", index=False)
+        else:
+            print("[DataAnalyst] Warning: 'agencyId' column not found in buildings.csv — agency stats skipped.")
+            df_agency = None
+
+        df["date"]  = pd.to_datetime(df["date"])
         df["month"] = df["date"].dt.to_period("M")
 
         monthlySales = (df.groupby("month").size().reset_index(name="sales_count"))
@@ -78,7 +98,19 @@ class DataAnalyst:
         monthlySalesByType = (df.groupby(["month", "type"]).size().reset_index(name="sales_count"))
         monthlySalesByZoneType = (df.groupby(["month", "zone", "type"]).size().reset_index(name="sales_count"))
 
-        monthlySales.to_csv("data/stats/monthlySales.csv", index=False)
-        monthlySalesByZone.to_csv("data/stats/monthlySalesByZone.csv", index=False)
-        monthlySalesByType.to_csv("data/stats/monthlySalesByType.csv", index=False)
+        monthlySales.to_csv("data/stats/monthlySales.csv",                 index=False)
+        monthlySalesByZone.to_csv("data/stats/monthlySalesByZone.csv",     index=False)
+        monthlySalesByType.to_csv("data/stats/monthlySalesByType.csv",     index=False)
         monthlySalesByZoneType.to_csv("data/stats/monthlySalesByZoneType.csv", index=False)
+
+        if df_agency is not None:
+            df_agency["date"]  = pd.to_datetime(df_agency["date"])
+            df_agency["month"] = df_agency["date"].dt.to_period("M")
+
+            monthlySalesByAgency = (
+                df_agency.groupby(["month", "agencyId_y"])
+                .size()
+                .reset_index(name="sales_count")
+                .rename(columns={"agencyId_y": "agencyId"})
+            )
+            monthlySalesByAgency.to_csv("data/stats/monthlySalesByAgency.csv", index=False)

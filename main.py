@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from functools import wraps
 import os
@@ -71,6 +71,38 @@ def GetPredictionByZoneAndType(zone: str, type_: str):
         })
     except ValueError as e:
         return jsonify({ "error": str(e) }), 404
+    
+@app.route("/predictions/agency/<string:agency_id>/forecast", methods=["GET"])
+def forecast_agency(agency_id: str):
+    months = request.args.get("months", default=3, type=int)
+    months = max(1, min(12, months))
+    try:
+        return jsonify(Model.GetInstance().ForecastAgencyNextMonths(agency_id, months))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+ 
+ 
+@app.route("/predictions/all", methods=["GET"])
+def predict_all():
+    try:
+        return jsonify(Model.GetInstance().PredictAllNextMonth())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+ 
+ 
+@app.route("/predictions/agency/<string:agency_id>", methods=["GET"])
+def predict_agency(agency_id: str):
+    try:
+        return jsonify({
+            "agency_id": agency_id,
+            "predicted": Model.GetInstance().PredictNextMonthPerAgency(agency_id)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 @app.route("/retrain", methods=["POST"])
 def Retrain():
