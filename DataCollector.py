@@ -1,10 +1,13 @@
 import csv
+from dotenv import load_dotenv
 import requests
 import os
 from collections import Counter
 
+load_dotenv()
+
 class DataCollector:
-    BASE_URL = "http://localhost:8080/api"
+    BASE_URL = os.getenv("API_BASE_URL")
 
     endpoints = {
         "login": "/auth/login",
@@ -29,7 +32,7 @@ class DataCollector:
     def CollectData(self):
         logReq = requests.post(
             f"{self.BASE_URL}{self.endpoints['login']}",
-            json={"email": "defaultagent@gmail.com", "password": "default"},
+            json={"email": os.getenv("AGENT_EMAIL"), "password": os.getenv("AGENT_PASSWORD")},
         )
         token = logReq.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}

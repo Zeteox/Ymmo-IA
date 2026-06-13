@@ -90,7 +90,7 @@ class DataAnalyst:
             print("[DataAnalyst] Warning: 'agencyId' column not found in buildings.csv — agency stats skipped.")
             df_agency = None
 
-        df["date"]  = pd.to_datetime(df["date"])
+        df["date"] = pd.to_datetime(df["date"], format="ISO8601")
         df["month"] = df["date"].dt.to_period("M")
 
         monthlySales = (df.groupby("month").size().reset_index(name="sales_count"))
@@ -104,7 +104,7 @@ class DataAnalyst:
         monthlySalesByZoneType.to_csv("data/stats/monthlySalesByZoneType.csv", index=False)
 
         if df_agency is not None:
-            df_agency["date"]  = pd.to_datetime(df_agency["date"])
+            df_agency["date"] = pd.to_datetime(df_agency["date"], format="ISO8601")
             df_agency["month"] = df_agency["date"].dt.to_period("M")
 
             monthlySalesByAgency = (
