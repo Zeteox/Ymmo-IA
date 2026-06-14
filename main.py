@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from functools import wraps
 import os
 from dotenv import load_dotenv
 from Model import Model
@@ -21,19 +20,23 @@ model.Train()
 
 CORS(app)
 
-@app.route("/predictions", methods=["GET"])
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return jsonify({"status": "ok"})
+
+@app.route("/ia/predictions", methods=["GET"])
 def GetAllPredictions():
     """Toutes les prédictions pour le mois suivant."""
     return jsonify(model.PredictAllNextMonth())
 
 
-@app.route("/predictions/global", methods=["GET"])
+@app.route("/ia/predictions/global", methods=["GET"])
 def GetGlobalPrediction():
     """Prédiction globale pour le mois suivant."""
     return jsonify({ "sales_count": model.PredictNextMonthGlobal() })
 
 
-@app.route("/predictions/zone/<string:zone>", methods=["GET"])
+@app.route("/ia/predictions/zone/<string:zone>", methods=["GET"])
 def GetPredictionByZone(zone: str):
     """
     Prédiction pour une zone spécifique.
@@ -45,7 +48,7 @@ def GetPredictionByZone(zone: str):
         return jsonify({ "error": f"Zone '{zone}' inconnue." }), 404
 
 
-@app.route("/predictions/type/<string:type_>", methods=["GET"])
+@app.route("/ia/predictions/type/<string:type_>", methods=["GET"])
 def GetPredictionByType(type_: str):
     """
     Prédiction pour un type de bâtiment spécifique.
@@ -57,7 +60,7 @@ def GetPredictionByType(type_: str):
         return jsonify({ "error": f"Type '{type_}' inconnu." }), 404
 
 
-@app.route("/predictions/zone/<string:zone>/type/<string:type_>", methods=["GET"])
+@app.route("/ia/predictions/zone/<string:zone>/type/<string:type_>", methods=["GET"])
 def GetPredictionByZoneAndType(zone: str, type_: str):
     """
     Prédiction pour une zone + type spécifique.
@@ -72,7 +75,7 @@ def GetPredictionByZoneAndType(zone: str, type_: str):
     except ValueError as e:
         return jsonify({ "error": str(e) }), 404
     
-@app.route("/predictions/agency/<string:agency_id>/forecast", methods=["GET"])
+@app.route("/ia/predictions/agency/<string:agency_id>/forecast", methods=["GET"])
 def forecast_agency(agency_id: str):
     months = request.args.get("months", default=3, type=int)
     months = max(1, min(12, months))
@@ -83,7 +86,7 @@ def forecast_agency(agency_id: str):
 
  
  
-@app.route("/predictions/all", methods=["GET"])
+@app.route("/ia/predictions/all", methods=["GET"])
 def predict_all():
     try:
         return jsonify(Model.GetInstance().PredictAllNextMonth())
@@ -92,7 +95,7 @@ def predict_all():
 
  
  
-@app.route("/predictions/agency/<string:agency_id>", methods=["GET"])
+@app.route("/ia/predictions/agency/<string:agency_id>", methods=["GET"])
 def predict_agency(agency_id: str):
     try:
         return jsonify({
@@ -104,7 +107,7 @@ def predict_agency(agency_id: str):
 
 
 
-@app.route("/retrain", methods=["POST"])
+@app.route("/ia/retrain", methods=["POST"])
 def Retrain():
     """
     Relance l'analyse + réentraîne les modèles.
@@ -114,14 +117,14 @@ def Retrain():
     model.Train()
     return jsonify({ "status": "ok", "message": "Modèles réentraînés." })
 
-@app.route("/trends/zones", methods=["GET"])
+@app.route("/ia/trends/zones", methods=["GET"])
 def GetSalesByZones():
     """Ventes totales groupées par zone."""
     df = pd.read_csv("data/stats/salesByZones.csv")
     return jsonify(df.to_dict(orient="records"))
 
  
-@app.route("/trends/zones/<string:zone>", methods=["GET"])
+@app.route("/ia/trends/zones/<string:zone>", methods=["GET"])
 def GetSalesByZone(zone: str):
     """Ventes pour une zone spécifique. Exemple : /trends/zones/ZONE_CENTRE"""
     df = pd.read_csv("data/stats/salesByZones.csv")
@@ -131,14 +134,14 @@ def GetSalesByZone(zone: str):
     return jsonify(result.iloc[0].to_dict())
  
  
-@app.route("/trends/types", methods=["GET"])
+@app.route("/ia/trends/types", methods=["GET"])
 def GetSalesByTypes():
     """Ventes totales groupées par type de bien."""
     df = pd.read_csv("data/stats/salesByType.csv")
     return jsonify(df.to_dict(orient="records"))
  
  
-@app.route("/trends/types/<string:type_>", methods=["GET"])
+@app.route("/ia/trends/types/<string:type_>", methods=["GET"])
 def GetSalesByType(type_: str):
     """Ventes pour un type spécifique. Exemple : /trends/types/APARTMENT"""
     df = pd.read_csv("data/stats/salesByType.csv")
@@ -148,7 +151,7 @@ def GetSalesByType(type_: str):
     return jsonify(result.iloc[0].to_dict())
  
  
-@app.route("/trends/zones/<string:zone>/types", methods=["GET"])
+@app.route("/ia/trends/zones/<string:zone>/types", methods=["GET"])
 def GetSalesByZoneTypes(zone: str):
     """Tous les types pour une zone donnée. Exemple : /trends/zones/ZONE_CENTRE/types"""
     df = pd.read_csv("data/stats/salesByZoneType.csv")
@@ -158,7 +161,7 @@ def GetSalesByZoneTypes(zone: str):
     return jsonify(result.to_dict(orient="records"))
  
  
-@app.route("/trends/zones/<string:zone>/types/<string:type_>", methods=["GET"])
+@app.route("/ia/trends/zones/<string:zone>/types/<string:type_>", methods=["GET"])
 def GetSalesByZoneAndType(zone: str, type_: str):
     """Ventes pour une zone + type précis. Exemple : /trends/zones/ZONE_CENTRE/types/HOUSE"""
     df = pd.read_csv("data/stats/salesByZoneType.csv")
@@ -168,28 +171,28 @@ def GetSalesByZoneAndType(zone: str, type_: str):
     return jsonify(result.iloc[0].to_dict())
  
  
-@app.route("/trends/prices", methods=["GET"])
+@app.route("/ia/trends/prices", methods=["GET"])
 def GetAvgPriceByZone():
     """Prix moyen par zone."""
     df = pd.read_csv("data/stats/avgPriceByZone.csv")
     return jsonify(df.to_dict(orient="records"))
  
  
-@app.route("/trends/monthly", methods=["GET"])
+@app.route("/ia/trends/monthly", methods=["GET"])
 def GetMonthlySales():
     """Ventes globales mois par mois."""
     df = pd.read_csv("data/stats/monthlySales.csv")
     return jsonify(df.to_dict(orient="records"))
  
  
-@app.route("/trends/monthly/zones", methods=["GET"])
+@app.route("/ia/trends/monthly/zones", methods=["GET"])
 def GetMonthlySalesByZone():
     """Ventes mois par mois, groupées par zone."""
     df = pd.read_csv("data/stats/monthlySalesByZone.csv")
     return jsonify(df.to_dict(orient="records"))
  
  
-@app.route("/trends/monthly/types", methods=["GET"])
+@app.route("/ia/trends/monthly/types", methods=["GET"])
 def GetMonthlySalesByType():
     """Ventes mois par mois, groupées par type."""
     df = pd.read_csv("data/stats/monthlySalesByType.csv")
